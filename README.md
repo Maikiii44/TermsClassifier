@@ -1,6 +1,6 @@
 # ♻ Terms Classifier
 
-This repo contains code to train a model that classifies terms into Nice Classes.  
+This repo contains code to train a model that classifies terms into classes.  
 It uses PEFT to finetune embedding models. The repo implements PEFT methods with  
 PyTorch Lightning.
 
