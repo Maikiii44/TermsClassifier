@@ -10,7 +10,7 @@ from transformers import AutoTokenizer, PreTrainedTokenizer, DataCollatorWithPad
 from datasets import Dataset
 
 from terms.schemas import TermsDataModel
-from terms.utils import save_dict_to_json, tokenize_to_ds
+from terms.utils import save_dict_to_json
 from terms.constants import COL_LABELS, DEFAULT_TOKENIZER_CONFIG
 
 from terms.logs import get_logger
@@ -39,20 +39,19 @@ class TermsDataModule(LightningDataModule):
     ):
 
         super().__init__()
-
         logger.info("Initialising TermsDataModule …")
         logger.info(
             f"Batch size: {batch_size}, workers: {num_workers}, persistent: {persistent_workers}"
         )
         logger.info(f"Tokenizer kwargs: {tokenizer_kwargs}")
-        logger.info(
-            f"Dataset sizes → train: {len(df_train)}, val: {len(df_val)}, test: {len(df_test)}"
-        )
 
         self.df_train = df_train
         self.df_val = df_val
         self.df_test = df_test
         self._pretrained_model = pretrained_model_name
+
+        self._label2id = None
+        self._id2label = None
 
         # Tokeniser setup – created on every process.
         self._tokenizer = self._build_tokenizer(
@@ -71,6 +70,7 @@ class TermsDataModule(LightningDataModule):
         self.batch_size = batch_size
         self.persistent_workers = persistent_workers
         self.prefetch_factor = prefetch_factor
+
         self.pin_memory = pin_memory
         self.pin_memory_device = (
             pin_memory_device
@@ -92,6 +92,14 @@ class TermsDataModule(LightningDataModule):
         )
 
     @property
+    def label2id(self):
+        return self._label2id
+
+    @property
+    def id2label(self):
+        return self._id2label
+
+    @property
     def tokenizer(self) -> PreTrainedTokenizer:
         """The *HF* tokenizer used for all splits."""
         return self._tokenizer
@@ -107,16 +115,6 @@ class TermsDataModule(LightningDataModule):
         set_pad_token: bool,
         pad_token_value: Optional[str],
     ) -> PreTrainedTokenizer:
-        """Create a tokenizer and add a PAD token if required.
-
-        Args:
-            model_name: Model checkpoint from the Hugging Face Hub or a local path.
-            set_pad_token: Whether to create a PAD token when one is missing.
-            pad_token_value: Custom PAD token string.
-
-        Returns:
-            A configured :class:`~transformers.PreTrainedTokenizer` instance.
-        """
         logger.info(f"Loading tokenizer: {model_name}")
         tokenizer: PreTrainedTokenizer = AutoTokenizer.from_pretrained(
             pretrained_model_name_or_path=model_name,
@@ -137,20 +135,16 @@ class TermsDataModule(LightningDataModule):
         return tokenizer
 
     def _tokenize_fn(self, batch):
-        """Vectorises a batch of raw text.
-
-        Args:
-            batch: Mapping containing the *Terms* column.
-
-        Returns:
-            Tokenised representation with ``input_ids`` and ``attention_mask``.
-        """
-        return self.tokenizer(
-            batch[TermsDataModel.Terms], **self.tokenizer_call_kwargs
-        )
+        return self.tokenizer(batch[TermsDataModel.Terms], **self.tokenizer_call_kwargs)
 
     def prepare_data(self) -> None:
-        """Tokenise every split and cache to ``disk`` (arrow format)."""
+
+        classes = sorted(self.df_train[TermsDataModel.NiceClass].unique())
+        self._label2id = {label: idx for idx, label in enumerate(classes)}
+        self._id2label = {idx: label for label, idx in self._label2id.items()}
+
+        logger.info(f"Label mapping: {self.label2id}")
+
         for split_name, df in {
             "train": self.df_train,
             "val": self.df_val,
@@ -164,13 +158,15 @@ class TermsDataModule(LightningDataModule):
                 f"Tokenising {split_name} split (rows={len(df)}) → {cache_path}"
             )
 
-            tokenised_ds = tokenize_to_ds(
-                dataframe=df,
-                tokenize_function=self._tokenize_fn,
-                extras_cols_to_keep=[TermsDataModel.NiceClass],
-            )
-            tokenised_ds = tokenised_ds.rename_column(
-                TermsDataModel.NiceClass, COL_LABELS
+            df = df.copy()
+            df[COL_LABELS] = df[TermsDataModel.NiceClass].map(self._label2id)
+            raw_ds = Dataset.from_pandas(df=df, preserve_index=False)
+            remove_cols = [col for col in raw_ds.column_names if col != COL_LABELS]
+            tokenised_ds = raw_ds.map(
+                function=self._tokenize_fn,
+                batched=True,
+                remove_columns=remove_cols,
+                desc=f"Tokenising {split_name}",
             )
             tokenised_ds.save_to_disk(cache_path)
 

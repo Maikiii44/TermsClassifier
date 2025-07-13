@@ -2,6 +2,7 @@ from typing import Optional, List, Sequence, Tuple
 
 import os
 import json
+import torch
 import pandas as pd
 from typing import Any, Dict
 from peft import PeftModel
@@ -159,19 +160,10 @@ def split_dataframe(
     return train_df, val_df, test_df
 
 
-def tokenize_to_ds(
-    dataframe: pd.DataFrame,
-    tokenize_function,
-    extras_cols_to_keep: Optional[List] = None,
-):
-    raw_ds = Dataset.from_pandas(dataframe, preserve_index=False)
-    cols_to_keep = [] + extras_cols_to_keep
-    remove_cols = [col for col in raw_ds.column_names if col not in cols_to_keep]
-    tokenised_ds = raw_ds.map(
-        function=tokenize_function,
-        batched=True,
-        remove_columns=remove_cols,
-        desc=f"Tokenising",
-    )
-
-    return tokenised_ds
+def get_device():
+    if torch.cuda.is_available():
+        return "cuda"
+    elif getattr(torch.backends, "mps", None) and torch.backends.mps.is_available():
+        return "mps"
+    else:
+        return "cpu"

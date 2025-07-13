@@ -57,6 +57,7 @@ class TermsModule(LightningModule):
         num_classes: int,
         metrics: MetricCollection,
         quantization_config: Optional[BitsAndBytesConfig] = None,
+        device: Optional[str] = "auto",
         **kwargs: Any,
     ):
         logger.info(
@@ -67,7 +68,7 @@ class TermsModule(LightningModule):
             AutoModelForSequenceClassification.from_pretrained(
                 pretrained_model_name_or_path=pretrained_model_name,
                 num_labels=num_classes,
-                device_map="auto",
+                device_map=device,
                 quantization_config=quantization_config,
             )
         )

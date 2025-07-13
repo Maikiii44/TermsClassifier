@@ -7,7 +7,7 @@ from terms.model.data import TermsDataModule
 from terms.model.metrics import get_metrics
 from terms.model.train import TermsTrainer
 from terms.model.module import TermsModule
-from terms.config import BaseLoraConfig
+from terms.config import BaseLoraConfig, BaseQuantisationConfig
 from terms.schemas import TermsDataModel
 from terms.preprocess import preprocess
 from terms.utils import split_dataframe
@@ -101,10 +101,19 @@ def train(
 
     logger.info("Loading LoRA configuration...")
     if lora_config_path is not None:
-        lora_config_dict = BaseLoraConfig.load_from_yaml(path=lora_config_path)
-        lora_config = lora_config_dict.to_lora_obj()
+        lora_config_obj = BaseLoraConfig.load_from_yaml(path=lora_config_path)
+        lora_config = lora_config_obj.to_lora_obj()
     else:
-        lora_config = BaseLoraConfig().to_lora_obj()
+        quantisation_config_obj = BaseLoraConfig().to_lora_obj()
+
+    logger.info("Loading quantisation config...")
+    if quantisation_path is not None:
+        quantisation_config_obj = BaseQuantisationConfig.load_from_yaml(
+            path=quantisation_path
+        )
+        quantisation_config = quantisation_config_obj.to_bits_and_bytes_obj()
+    else:
+        quantisation_config = None
 
     logger.info("Initializing model...")
     pl_model = TermsModule.from_peft_config(
@@ -112,6 +121,7 @@ def train(
         num_classes=num_classes,
         metrics=metrics,
         lora_config=lora_config,
+        quantization_config=quantisation_config,
     )
 
     logger.info("Initializing trainer...")

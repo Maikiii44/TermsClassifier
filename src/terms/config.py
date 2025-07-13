@@ -2,8 +2,10 @@ from typing import List, Union
 from pathlib import Path
 
 import yaml
+import torch
 from peft import LoraConfig, TaskType
 from pydantic import BaseModel, Field, field_validator
+from transformers import BitsAndBytesConfig
 
 
 class BaseLoraConfig(BaseModel):
@@ -28,3 +30,21 @@ class BaseLoraConfig(BaseModel):
     def load_from_yaml(cls, path: Path | str) -> "BaseLoraConfig":
         with Path(path).open(encoding="utf-8") as f:
             return cls(**yaml.safe_load(f))
+
+
+class BaseQuantisationConfig(BaseModel):
+    load_in_4bit: bool
+    bnb_4bit_quant_type: str
+    bnb_4bit_use_double_quant: bool
+    bnb_4bit_compute_dtype: torch.dtype
+
+    def to_bits_and_bytes_obj(self) -> BitsAndBytesConfig:
+        return BitsAndBytesConfig(**self.model_dump())
+
+    @classmethod
+    def load_from_yaml(cls, path: Path | str):
+        with Path(path).open(encoding="utf-8") as f:
+            return cls(**yaml.safe_load(f))
+
+    class Config:
+        arbitrary_types_allowed = True
