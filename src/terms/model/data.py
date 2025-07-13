@@ -15,7 +15,7 @@ from terms.constants import COL_LABELS, DEFAULT_TOKENIZER_CONFIG
 
 from terms.logs import get_logger
 
-logger = get_logger(name=__name__)
+LOGGER = get_logger(name=__name__)
 
 
 class TermsDataModule(LightningDataModule):
@@ -39,11 +39,11 @@ class TermsDataModule(LightningDataModule):
     ):
 
         super().__init__()
-        logger.info("Initialising TermsDataModule …")
-        logger.info(
+        LOGGER.info("Initialising TermsDataModule …")
+        LOGGER.info(
             f"Batch size: {batch_size}, workers: {num_workers}, persistent: {persistent_workers}"
         )
-        logger.info(f"Tokenizer kwargs: {tokenizer_kwargs}")
+        LOGGER.info(f"Tokenizer kwargs: {tokenizer_kwargs}")
 
         self.df_train = df_train
         self.df_val = df_val
@@ -115,7 +115,7 @@ class TermsDataModule(LightningDataModule):
         set_pad_token: bool,
         pad_token_value: Optional[str],
     ) -> PreTrainedTokenizer:
-        logger.info(f"Loading tokenizer: {model_name}")
+        LOGGER.info(f"Loading tokenizer: {model_name}")
         tokenizer: PreTrainedTokenizer = AutoTokenizer.from_pretrained(
             pretrained_model_name_or_path=model_name,
             trust_remote_code=True,
@@ -128,7 +128,7 @@ class TermsDataModule(LightningDataModule):
                 tokenizer.pad_token = (
                     tokenizer.eos_token
                 )  # fallback for GPT‑like models
-            logger.info(
+            LOGGER.info(
                 f"PAD token set to: {tokenizer.pad_token} (id={tokenizer.pad_token_id})"
             )
 
@@ -143,7 +143,7 @@ class TermsDataModule(LightningDataModule):
         self._label2id = {label: idx for idx, label in enumerate(classes)}
         self._id2label = {idx: label for label, idx in self._label2id.items()}
 
-        logger.info(f"Label mapping: {self.label2id}")
+        LOGGER.info(f"Label mapping: {self.label2id}")
 
         for split_name, df in {
             "train": self.df_train,
@@ -154,7 +154,7 @@ class TermsDataModule(LightningDataModule):
             if cache_path.exists():
                 continue
 
-            logger.info(
+            LOGGER.info(
                 f"Tokenising {split_name} split (rows={len(df)}) → {cache_path}"
             )
 
@@ -182,15 +182,15 @@ class TermsDataModule(LightningDataModule):
         if stage in ("fit", None):
             self.train_ds = _load("train")
             self.val_ds = _load("val")
-            logger.info(
+            LOGGER.info(
                 f"Datasets loaded → train: {len(self.train_ds)}, val: {len(self.val_ds)}"
             )
         if stage in ("test", None):
             self.test_ds = _load("test")
-            logger.info(f"Test dataset loaded → n: {len(self.test_ds)}")
+            LOGGER.info(f"Test dataset loaded → n: {len(self.test_ds)}")
 
     def train_dataloader(self):  # noqa: D401
-        logger.info("Creating training DataLoader …")
+        LOGGER.info("Creating training DataLoader …")
         return DataLoader(
             dataset=self.train_ds,
             batch_size=self.batch_size,
@@ -204,7 +204,7 @@ class TermsDataModule(LightningDataModule):
         )
 
     def val_dataloader(self):  # noqa: D401
-        logger.info("Creating validation DataLoader …")
+        LOGGER.info("Creating validation DataLoader …")
         return DataLoader(
             dataset=self.val_ds,
             batch_size=self.batch_size,
@@ -218,7 +218,7 @@ class TermsDataModule(LightningDataModule):
         )
 
     def test_dataloader(self):  # noqa: D401
-        logger.info("Creating test DataLoader …")
+        LOGGER.info("Creating test DataLoader …")
         return DataLoader(
             dataset=self.test_ds,
             batch_size=self.batch_size,

@@ -1,4 +1,5 @@
 import typer
+from typing import Optional, Union
 import pandas as pd
 from typing import Optional, Annotated, List
 from pathlib import Path
@@ -17,9 +18,49 @@ from terms.constants import (
     DEFAULT_TOKENIZER_CONFIG,
 )
 
-logger = get_logger(name=__name__)
+LOGGER = get_logger(__name__)
 
 app = typer.Typer(name="terms")
+
+
+def _load_lora_config(path: Optional[Union[Path, str]]):
+    """Return a PEFT LoRA configuration object.
+
+    If *path* is provided it must exist; otherwise the default `BaseLoraConfig`
+    is used.
+    """
+
+    if isinstance(path, str):
+        path = Path(path)
+
+    if path is None:
+        LOGGER.info("Using default LoRA configuration …")
+        return BaseLoraConfig().to_lora_obj()
+
+    if not path.exists():
+        raise FileNotFoundError(f"LoRA configuration not found: {path}")
+
+    LOGGER.info("Loading LoRA configuration from %s …", path)
+    return BaseLoraConfig.load_from_yaml(path=path).to_lora_obj()
+
+
+def _load_quant_config(path: Optional[Union[Path, str]]):
+    """Return a bits‑and‑bytes quantisation configuration or *None*.
+
+    The configuration is only loaded when *path* is provided and exists.
+    """
+    if isinstance(path, str):
+        path = Path(path)
+
+    if path is None:
+        LOGGER.info("No quantisation requested – training in full precision …")
+        return None
+
+    if not path.exists():
+        raise FileNotFoundError(f"Quantisation configuration not found: {path}")
+
+    LOGGER.info("Loading quantisation configuration from %s …", path)
+    return BaseQuantisationConfig.load_from_yaml(path=path).to_bits_and_bytes_obj()
 
 
 @app.command(name="train")
@@ -70,13 +111,13 @@ def train(
     if model_dir is None:
         model_dir = f"model_{pretrained_model_name.replace("/", "_")}"
 
-    logger.info("Loading dataset...")
+    LOGGER.info("Loading dataset...")
     df_base = pd.read_parquet(path=data_filepath)
 
-    logger.info("Preprocessing the data...")
+    LOGGER.info("Preprocessing the data...")
     df_preprocess = preprocess(data=df_base)
 
-    logger.info("Splitting dataset...")
+    LOGGER.info("Splitting dataset...")
     df_train, df_val, df_test = split_dataframe(
         df=df_preprocess,
         train_size=train_size,
@@ -85,7 +126,7 @@ def train(
     )
     num_classes = len(df_train.NiceClass.unique())
 
-    logger.info("Loading tokenizer and preparing datamodule...")
+    LOGGER.info("Loading tokenizer and preparing datamodule...")
     pl_datamodule = TermsDataModule(
         df_train=df_train,
         df_val=df_val,
@@ -96,26 +137,14 @@ def train(
         model_dir=model_dir,
     )
 
-    logger.info("Loading metrics...")
+    LOGGER.info("Loading metrics...")
     metrics = get_metrics(num_classes=num_classes, top_k=top_k)
 
-    logger.info("Loading LoRA configuration...")
-    if lora_config_path is not None:
-        lora_config_obj = BaseLoraConfig.load_from_yaml(path=lora_config_path)
-        lora_config = lora_config_obj.to_lora_obj()
-    else:
-        quantisation_config_obj = BaseLoraConfig().to_lora_obj()
+    LOGGER.info("Preparing PEFT & quantisation configs …")
+    lora_config = _load_lora_config(lora_config_path)
+    quantisation_config = _load_quant_config(quantisation_path)
 
-    logger.info("Loading quantisation config...")
-    if quantisation_path is not None:
-        quantisation_config_obj = BaseQuantisationConfig.load_from_yaml(
-            path=quantisation_path
-        )
-        quantisation_config = quantisation_config_obj.to_bits_and_bytes_obj()
-    else:
-        quantisation_config = None
-
-    logger.info("Initializing model...")
+    LOGGER.info("Initializing model...")
     pl_model = TermsModule.from_peft_config(
         pretrained_model_name=pretrained_model_name,
         num_classes=num_classes,
@@ -124,7 +153,7 @@ def train(
         quantization_config=quantisation_config,
     )
 
-    logger.info("Initializing trainer...")
+    LOGGER.info("Initialising trainer (epochs=%d, precision=%s) …", epochs, precision)
     trainer = TermsTrainer(
         pl_datamodule=pl_datamodule,
         pl_model=pl_model,
@@ -133,10 +162,10 @@ def train(
         precision=precision,
     )
 
-    logger.info("Starting training...")
+    LOGGER.info("Starting training...")
     trainer.train()
 
-    logger.info("Evaluating on test set...")
+    LOGGER.info("Evaluating on test set...")
     trainer.test()
 
     raise typer.Exit(code=0)

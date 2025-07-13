@@ -12,7 +12,7 @@ from pytorch_lightning.trainer.connectors.accelerator_connector import _PRECISIO
 from terms.logs import get_logger
 
 
-logger = get_logger(__name__)
+LOGGER = get_logger(__name__)
 
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
@@ -65,9 +65,9 @@ class TermsTrainer:
 
         self.set_seed()
 
-        logger.info("Start training the model...")
+        LOGGER.info("Start training the model...")
         self.trainer.fit(model=self.pl_model, datamodule=self.pl_datamodule)
-        logger.info("Training finished!")
+        LOGGER.info("Training finished!")
 
         return self.trainer.logged_metrics
 
@@ -79,9 +79,9 @@ class TermsTrainer:
             :pymeth:`~pytorch_lightning.Trainer.test`.
         """
 
-        logger.info("Start testing the model...")
+        LOGGER.info("Start testing the model...")
         results = self.trainer.test(datamodule=self.pl_datamodule, ckpt_path="best")
-        logger.info("Testing finished!")
+        LOGGER.info("Testing finished!")
 
         return results
 
@@ -94,7 +94,7 @@ class TermsTrainer:
                 identical results given the same hardware and deterministic
                 operations.
         """
-        logger.info("Setting the seed value to {seed}")
+        LOGGER.info("Setting the seed value to {seed}")
         seed_everything(seed=seed)
 
     def _default_logger(self):

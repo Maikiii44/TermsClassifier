@@ -16,7 +16,7 @@ from transformers import (
 from terms.utils import get_base_model_name, get_peft_config_dict
 from terms.logs import get_logger
 
-logger = get_logger(name=__name__)
+LOGGER = get_logger(name=__name__)
 
 
 class TermsModule(LightningModule):
@@ -45,7 +45,7 @@ class TermsModule(LightningModule):
         )
         self.save_hyperparameters(ignore=["model", "metrics"])
 
-        logger.info(
+        LOGGER.info(
             f"Initialized {self.__class__.__name__} with model: {self.hparams['model_name']}"
         )
 
@@ -60,7 +60,7 @@ class TermsModule(LightningModule):
         device: Optional[str] = "auto",
         **kwargs: Any,
     ):
-        logger.info(
+        LOGGER.info(
             f"Loading base model '{pretrained_model_name}' with {num_classes} classes."
         )
 
@@ -78,7 +78,7 @@ class TermsModule(LightningModule):
 
         model = get_peft_model(model=base_model, peft_config=lora_config, **kwargs)
 
-        logger.info("Peft model created successfully from config.")
+        LOGGER.info("Peft model created successfully from config.")
 
         return cls(
             model=model,
@@ -95,7 +95,7 @@ class TermsModule(LightningModule):
         **kwargs,
     ):
 
-        logger.info(
+        LOGGER.info(
             f"Loading base model '{pretrained_model_name}' from adapter '{adapter_dir}'."
         )
 
@@ -109,7 +109,7 @@ class TermsModule(LightningModule):
             model=base_model, model_id=adapter_dir, device_map=device_map
         )
 
-        logger.info("Peft model loaded successfully from adapter.")
+        LOGGER.info("Peft model loaded successfully from adapter.")
 
         return cls(model=model)
 
@@ -156,14 +156,14 @@ class TermsModule(LightningModule):
         try:
             return metrics.compute()
         except Exception as e:
-            logger.warning(f"Skipping {stage} metric computation due to: {e}")
+            LOGGER.warning(f"Skipping {stage} metric computation due to: {e}")
             return {}
 
     def on_train_start(self):
         if not self.train_metrics:
             raise RuntimeError("You started `fit()` but `metrics` was None.")
 
-        logger.info("Training started.")
+        LOGGER.info("Training started.")
 
     def training_step(self, batch, batch_idx):
         loss, probs, _preds, labels = self._shared_step(batch=batch)
@@ -212,7 +212,7 @@ class TermsModule(LightningModule):
         optimizer = AdamW(
             params, lr=self.hparams.lr, weight_decay=self.hparams.weight_decay
         )
-        logger.info("Optimizer configured.")
+        LOGGER.info("Optimizer configured.")
         return [optimizer]
 
     def on_save_checkpoint(self, checkpoint: dict):
