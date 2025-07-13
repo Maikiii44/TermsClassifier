@@ -68,10 +68,12 @@ class TermsModule(LightningModule):
             AutoModelForSequenceClassification.from_pretrained(
                 pretrained_model_name_or_path=pretrained_model_name,
                 num_labels=num_classes,
-                device_map=device,
                 quantization_config=quantization_config,
             )
         )
+
+        if device is not None:
+            base_model = base_model.to(device) 
 
         if isinstance(lora_config, dict):
             lora_config = LoraConfig(**lora_config)

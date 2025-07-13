@@ -1,6 +1,6 @@
 from typing import Optional, List, Sequence, Tuple
 
-import os
+import typer
 import json
 import torch
 import pandas as pd
@@ -160,12 +160,26 @@ def split_dataframe(
     return train_df, val_df, test_df
 
 
-def get_device():
-    if torch.cuda.is_available():
+def resolve_device(device: str = "auto") -> str:
+    device = device.lower()
+    if device == "auto":
+        if torch.cuda.is_available():
+            return "cuda"
+        elif torch.backends.mps.is_available() and torch.backends.mps.is_built():
+            return "mps"
+        else:
+            return "cpu"
+    elif device == "cuda":
+        if not torch.cuda.is_available():
+            raise typer.BadParameter("CUDA was requested but is not available.")
         return "cuda"
-    elif getattr(torch.backends, "mps", None) and torch.backends.mps.is_available():
+    elif device == "mps":
+        if not (torch.backends.mps.is_available() and torch.backends.mps.is_built()):
+            raise typer.BadParameter(
+                "MPS (Apple GPU) was requested but is not available."
+            )
         return "mps"
-    else:
+    elif device == "cpu":
         return "cpu"
-
-
+    else:
+        raise typer.BadParameter(f"Unknown device: {device}")

@@ -34,7 +34,6 @@ class TermsDataModule(LightningDataModule):
         pad_token_value: Optional[str] = None,
         prefetch_factor: int = 2,
         pin_memory: bool = True,
-        pin_memory_device: Optional[str] = None,
         model_dir: str = "./model_dir",
     ):
 
@@ -72,15 +71,6 @@ class TermsDataModule(LightningDataModule):
         self.prefetch_factor = prefetch_factor
 
         self.pin_memory = pin_memory
-        self.pin_memory_device = (
-            pin_memory_device
-            if pin_memory_device is not None
-            else (
-                f"cuda:{torch.cuda.current_device()}"
-                if torch.cuda.is_available()
-                else ""
-            )
-        )
         self.tokenizer_call_kwargs = tokenizer_kwargs or DEFAULT_TOKENIZER_CONFIG
 
         # Disk cache for Arrow files
@@ -196,7 +186,6 @@ class TermsDataModule(LightningDataModule):
             batch_size=self.batch_size,
             num_workers=self.num_workers,
             pin_memory=self.pin_memory,
-            pin_memory_device=self.pin_memory_device,
             persistent_workers=self.persistent_workers and self.num_workers > 0,
             collate_fn=self.data_collator,
             prefetch_factor=self.prefetch_factor if self.num_workers > 0 else None,
@@ -210,7 +199,6 @@ class TermsDataModule(LightningDataModule):
             batch_size=self.batch_size,
             num_workers=self.num_workers,
             pin_memory=self.pin_memory,
-            pin_memory_device=self.pin_memory_device,
             persistent_workers=self.persistent_workers and self.num_workers > 0,
             collate_fn=self.data_collator,
             prefetch_factor=self.prefetch_factor if self.num_workers > 0 else None,
@@ -224,7 +212,6 @@ class TermsDataModule(LightningDataModule):
             batch_size=self.batch_size,
             num_workers=self.num_workers,
             pin_memory=self.pin_memory,
-            pin_memory_device=self.pin_memory_device,
             persistent_workers=self.persistent_workers and self.num_workers > 0,
             collate_fn=self.data_collator,
             prefetch_factor=self.prefetch_factor if self.num_workers > 0 else None,

@@ -11,7 +11,7 @@ from terms.model.module import TermsModule
 from terms.config import BaseLoraConfig, BaseQuantisationConfig
 from terms.schemas import TermsDataModel
 from terms.preprocess import preprocess
-from terms.utils import split_dataframe
+from terms.utils import split_dataframe, resolve_device
 from terms.logs import get_logger
 from terms.constants import (
     PRETRAINED_MODEL_NAME,
@@ -40,7 +40,7 @@ def _load_lora_config(path: Optional[Union[Path, str]]):
     if not path.exists():
         raise FileNotFoundError(f"LoRA configuration not found: {path}")
 
-    LOGGER.info("Loading LoRA configuration from %s …", path)
+    LOGGER.info(f"Loading LoRA configuration from {path} …")
     return BaseLoraConfig.load_from_yaml(path=path).to_lora_obj()
 
 
@@ -59,7 +59,7 @@ def _load_quant_config(path: Optional[Union[Path, str]]):
     if not path.exists():
         raise FileNotFoundError(f"Quantisation configuration not found: {path}")
 
-    LOGGER.info("Loading quantisation configuration from %s …", path)
+    LOGGER.info("Loading quantisation configuration from {path} …")
     return BaseQuantisationConfig.load_from_yaml(path=path).to_bits_and_bytes_obj()
 
 
@@ -92,6 +92,12 @@ def train(
             help="Proportion of data to use for training. Must be between 0.0 and 1.0."
         ),
     ] = 0.7,
+    device: Annotated[
+        str,
+        typer.Option(
+            help="Device to use: 'auto', 'cpu', 'cuda', or 'mps'. 'auto' prefers CUDA, then MPS, then CPU."
+        ),
+    ] = "auto",
     precision: Annotated[
         Optional[str],
         typer.Option(
@@ -110,6 +116,9 @@ def train(
 
     if model_dir is None:
         model_dir = f"model_{pretrained_model_name.replace("/", "_")}"
+
+    resolved_device = resolve_device(device)
+    LOGGER.info(f"Using device: {resolved_device}")
 
     LOGGER.info("Loading dataset...")
     df_base = pd.read_parquet(path=data_filepath)
@@ -151,15 +160,17 @@ def train(
         metrics=metrics,
         lora_config=lora_config,
         quantization_config=quantisation_config,
+        device=resolved_device,
     )
 
-    LOGGER.info("Initialising trainer (epochs=%d, precision=%s) …", epochs, precision)
+    LOGGER.info(f"Initialising trainer (epochs={epochs}, precision={precision}) …")
     trainer = TermsTrainer(
         pl_datamodule=pl_datamodule,
         pl_model=pl_model,
         max_epochs=epochs,
         model_dir=model_dir,
         precision=precision,
+        accelerator=resolved_device,
     )
 
     LOGGER.info("Starting training...")
